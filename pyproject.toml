@@ -1,0 +1,33 @@
+[project]
+name = "silocrawl"
+version = "0.1.0"
+description = "Open-source, LLM-powered web scraping toolkit"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "httpx>=0.27",
+    "selectolax>=0.3.21",       # fast HTML parsing
+    "trafilatura>=1.8",         # main-content extraction
+    "markdownify>=0.12",        # html -> markdown
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "arq>=0.25",                # redis task queue
+    "redis>=5.0",
+    "openai>=1.0",
+    "playwright>=1.43",         # optional JS rendering
+    "tenacity>=8.2",            # retries
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "respx>=0.21", "ruff>=0.4"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

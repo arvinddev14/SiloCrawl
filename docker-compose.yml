@@ -1,0 +1,20 @@
+services:
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379
+    depends_on: [redis]
+
+  worker:
+    build: .
+    command: arq app.workers.crawl_worker.WorkerSettings
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379
+    depends_on: [redis]
