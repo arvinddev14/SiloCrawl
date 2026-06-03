@@ -2,25 +2,44 @@
 name = "silocrawl"
 version = "0.1.0"
 description = "Open-source, LLM-powered web scraping toolkit"
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.10"
+keywords = ["scraping", "crawling", "llm", "ai", "web-scraping", "data-extraction"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
     "httpx>=0.27",
-    "selectolax>=0.3.21",       # fast HTML parsing
-    "trafilatura>=1.8",         # main-content extraction
-    "markdownify>=0.12",        # html -> markdown
+    "selectolax>=0.3.21",
+    "trafilatura>=1.8",
+    "markdownify>=0.12",
     "pydantic>=2.6",
     "pydantic-settings>=2.2",
-    "arq>=0.25",                # redis task queue
+    "arq>=0.25",
     "redis>=5.0",
     "openai>=1.0",
-    "playwright>=1.43",         # optional JS rendering
-    "tenacity>=8.2",            # retries
+    "playwright>=1.43",
+    "tenacity>=8.2",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "respx>=0.21", "ruff>=0.4"]
+sdk = []  # alias — core deps already cover the SDK
+
+[project.urls]
+Homepage = "https://github.com/arvinddev14/SiloCrawl"
+Repository = "https://github.com/arvinddev14/SiloCrawl"
+
+[tool.setuptools.packages.find]
+include = ["app*", "silocrawl*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
