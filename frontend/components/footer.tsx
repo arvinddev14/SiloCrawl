@@ -37,7 +37,7 @@ export function Footer() {
             <h4 className="text-sm font-medium text-white mb-3">Community</h4>
             <ul className="space-y-2 text-sm text-zinc-400">
               <li>
-                <a href="https://github.com/you/silocrawl" target="_blank" rel="noopener noreferrer"
+                <a href="https://github.com/arvinddev14/SiloCrawl" target="_blank" rel="noopener noreferrer"
                   className="hover:text-white transition-colors">GitHub</a>
               </li>
             </ul>

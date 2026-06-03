@@ -42,7 +42,7 @@ export function Navbar() {
           </div>
           <div className="flex items-center gap-3">
             <a
-              href="https://github.com/you/silocrawl"
+              href="https://github.com/arvinddev14/SiloCrawl"
               target="_blank"
               rel="noopener noreferrer"
               className="text-zinc-400 hover:text-white transition-colors text-sm"

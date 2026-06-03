@@ -259,7 +259,7 @@ export default function Home() {
             <p className="text-zinc-400 mb-8">Self-host in minutes with Docker or run locally.</p>
             <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-left mb-8 font-mono text-sm">
               <p className="text-zinc-500"># Get started</p>
-              <p className="text-zinc-300">git clone https://github.com/you/silocrawl</p>
+              <p className="text-zinc-300">git clone https://github.com/arvinddev14/SiloCrawl</p>
               <p className="text-zinc-300">cd silocrawl && cp .env.example .env</p>
               <p className="text-teal-400">docker compose up</p>
             </div>
