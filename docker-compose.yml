@@ -9,6 +9,9 @@ services:
     env_file: .env
     environment:
       REDIS_URL: redis://redis:6379
+      DATABASE_URL: sqlite+aiosqlite:////data/silocrawl.db
+    volumes:
+      - silodata:/data
     depends_on: [redis]
 
   worker:
@@ -17,4 +20,18 @@ services:
     env_file: .env
     environment:
       REDIS_URL: redis://redis:6379
+      DATABASE_URL: sqlite+aiosqlite:////data/silocrawl.db
+    volumes:
+      - silodata:/data
     depends_on: [redis]
+
+  frontend:
+    build: ./frontend
+    ports: ["3000:3000"]
+    environment:
+      # Browser-side calls go to the host-published API port.
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on: [api]
+
+volumes:
+  silodata:

@@ -1,7 +1,6 @@
 """Tiny Redis-backed store for crawl job state."""
 from __future__ import annotations
 
-import json
 
 import redis.asyncio as redis
 

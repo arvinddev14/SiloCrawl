@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { cn } from "@/lib/utils";
 import { api, type ScrapeFormat } from "@/lib/api";
+import { flushNow, track } from "@/lib/telemetry";
 
 type Endpoint = "scrape" | "map" | "extract" | "crawl";
 
@@ -47,6 +48,19 @@ export default function PlaygroundPage() {
   const [polling, setPolling] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // UX telemetry: report abandons (tab hidden while a request is in flight).
+  const pendingRef = useRef<Endpoint | null>(null);
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden" && pendingRef.current) {
+        track("playground.abandon", undefined, { endpoint: pendingRef.current });
+        flushNow(true); // beacon — survives the page going away
+      }
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => document.removeEventListener("visibilitychange", onHide);
+  }, []);
+
   const toggleFormat = (f: ScrapeFormat) => {
     setFormats((prev) =>
       prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]
@@ -76,6 +90,9 @@ export default function PlaygroundPage() {
     setError(null);
     setResult(null);
     setJobId(null);
+    const startedAt = performance.now();
+    track("playground.request", undefined, { endpoint });
+    pendingRef.current = endpoint;
 
     try {
       if (endpoint === "scrape") {
@@ -114,12 +131,26 @@ export default function PlaygroundPage() {
       }
     } catch (e) {
       setError(String(e));
+      track("playground.error", undefined, {
+        endpoint,
+        message: String(e).slice(0, 200),
+      });
     } finally {
+      track("playground.wait", Math.round(performance.now() - startedAt), { endpoint });
+      pendingRef.current = null;
       setLoading(false);
     }
   };
 
-  const resultStr = result ? JSON.stringify(result, null, 2) : null;
+  const resultStr = result
+    ? JSON.stringify(
+        result.screenshot
+          ? { ...result, screenshot: "[base64 PNG — previewed above]" }
+          : result,
+        null,
+        2
+      )
+    : null;
 
   return (
     <>
@@ -182,7 +213,7 @@ export default function PlaygroundPage() {
                   <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Formats</span>
                 </div>
                 <div className="p-4 flex flex-wrap gap-2">
-                  {(["markdown", "html", "text", "links"] as ScrapeFormat[]).map((f) => (
+                  {(["markdown", "html", "text", "links", "screenshot"] as ScrapeFormat[]).map((f) => (
                     <button
                       key={f}
                       onClick={() => toggleFormat(f)}
@@ -353,6 +384,14 @@ export default function PlaygroundPage() {
               )}
               {loading && !result && (
                 <p className="text-sm text-zinc-500 animate-pulse">Waiting for response…</p>
+              )}
+              {result?.screenshot && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`data:image/png;base64,${result.screenshot}`}
+                  alt="Page screenshot"
+                  className="mb-4 max-h-[400px] w-auto rounded-md border border-zinc-800"
+                />
               )}
               {resultStr && (
                 <pre className="text-xs font-mono text-zinc-300 overflow-auto max-h-[600px] leading-relaxed whitespace-pre-wrap">
