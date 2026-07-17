@@ -65,11 +65,10 @@ async def fetch_static(
     headers = {"User-Agent": settings.user_agent}
     if extra_headers:
         headers.update(extra_headers)
-    async with httpx.AsyncClient(
+    async with netguard.guarded_async_client(
         follow_redirects=True,
         timeout=settings.request_timeout,
         headers=headers,
-        event_hooks=netguard.event_hooks(),
     ) as client:
         async with client.stream("GET", url) as resp:
             resp.raise_for_status()

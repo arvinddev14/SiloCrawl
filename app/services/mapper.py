@@ -24,10 +24,9 @@ def _same_site(url: str, base: str, include_subdomains: bool) -> bool:
 async def _from_sitemap(base: str) -> list[str]:
     root = f"{urlparse(base).scheme}://{urlparse(base).netloc}"
     urls: list[str] = []
-    async with httpx.AsyncClient(
+    async with netguard.guarded_async_client(
         timeout=settings.request_timeout,
         headers={"User-Agent": settings.user_agent},
-        event_hooks=netguard.event_hooks(),
     ) as client:
         for path in ("/sitemap.xml", "/sitemap_index.xml"):
             try:
