@@ -39,11 +39,10 @@ async def _get_parser(root: str) -> RobotFileParser | None:
 
     parser: RobotFileParser | None = None
     try:
-        async with httpx.AsyncClient(
+        async with netguard.guarded_async_client(
             timeout=10.0,
             follow_redirects=True,
             headers={"User-Agent": settings.user_agent},
-            event_hooks=netguard.event_hooks(),
         ) as client:
             resp = await client.get(f"{root}/robots.txt")
         if resp.status_code == 200:

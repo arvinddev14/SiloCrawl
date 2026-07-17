@@ -1,7 +1,9 @@
+import httpcore
 import httpx
 import pytest
 import respx
 
+from app.core.config import get_settings
 from app.services import documents, fetcher, netguard
 from app.services.documents import DocumentTooLargeError
 from app.services.fetcher import FetchTooLargeError
@@ -13,6 +15,24 @@ def _resolve_to(monkeypatch, *ips: str) -> None:
         return list(ips)
 
     monkeypatch.setattr(netguard, "_resolve", fake)
+
+
+class _FakeInner(httpcore.AsyncNetworkBackend):
+    """Records what the pinned backend actually dials, without opening a socket."""
+
+    def __init__(self):
+        self.dialed: tuple[str, int] | None = None
+
+    async def connect_tcp(self, host, port, timeout=None, local_address=None,
+                          socket_options=None):
+        self.dialed = (host, port)
+        return object()  # a real AsyncNetworkStream is never used in these tests
+
+    async def connect_unix_socket(self, *args, **kwargs):
+        raise NotImplementedError
+
+    async def sleep(self, seconds):
+        pass
 
 
 # ---------- address classification ----------
@@ -135,6 +155,48 @@ async def test_document_download_size_cap(monkeypatch):
     )
     with pytest.raises(DocumentTooLargeError):
         await documents.download("https://example.com/big.pdf")
+
+
+# ---------- pinned backend: closes the DNS-rebinding TOCTOU ----------
+
+async def test_backend_pins_validated_ip(monkeypatch):
+    # The backend dials the validated IP it resolved, not the hostname, so the
+    # address checked is exactly the address connected to (no second lookup).
+    _resolve_to(monkeypatch, "93.184.216.34")
+    inner = _FakeInner()
+    await netguard._GuardedBackend(inner).connect_tcp("example.com", 443)
+    assert inner.dialed == ("93.184.216.34", 443)
+
+
+async def test_backend_blocks_private_at_connect(monkeypatch):
+    # Even if an earlier check saw a public answer, the backend re-validates at
+    # dial time; a rebinding to a private IP is refused and never dialed.
+    _resolve_to(monkeypatch, "10.0.0.5")
+    inner = _FakeInner()
+    with pytest.raises(PrivateAddressError):
+        await netguard._GuardedBackend(inner).connect_tcp("rebind.example", 80)
+    assert inner.dialed is None
+
+
+async def test_backend_opt_out_dials_hostname(monkeypatch):
+    monkeypatch.setattr(get_settings(), "allow_private_networks", True)
+    inner = _FakeInner()
+    await netguard._GuardedBackend(inner).connect_tcp("localhost", 6379)
+    assert inner.dialed == ("localhost", 6379)
+
+
+async def test_backend_refuses_unix_socket():
+    with pytest.raises(PrivateAddressError):
+        await netguard._GuardedBackend(_FakeInner()).connect_unix_socket("/tmp/x.sock")
+
+
+async def test_guarded_client_installs_pinned_backend():
+    client = netguard.guarded_async_client()
+    try:
+        backend = client._transport._pool._network_backend
+        assert isinstance(backend, netguard._GuardedBackend)
+    finally:
+        await client.aclose()
 
 
 # ---------- surfaced as HTTP 403 ----------

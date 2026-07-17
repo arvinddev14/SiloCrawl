@@ -15,8 +15,6 @@ from pathlib import PurePosixPath
 from typing import Any, Callable
 from urllib.parse import urlparse
 
-import httpx
-
 from app.core.config import get_settings
 from app.models.schemas import OutputFormat
 from app.services import cleaner, netguard, robots
@@ -297,11 +295,10 @@ async def download(url: str) -> tuple[bytes, str | None]:
             min_delay = max(site_delay, settings.per_domain_delay)
     await throttle.wait(url, min_delay)
 
-    async with httpx.AsyncClient(
+    async with netguard.guarded_async_client(
         follow_redirects=True,
         timeout=settings.request_timeout,
         headers={"User-Agent": settings.user_agent},
-        event_hooks=netguard.event_hooks(),
     ) as client:
         # Stream with a cap: the size check must happen while downloading, not
         # after the whole body already sits in memory.
