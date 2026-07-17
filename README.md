@@ -9,22 +9,23 @@ An open-source, LLM-powered web scraping toolkit — a clean-room alternative to
 - **Map** — fast URL discovery for a domain (sitemap + link extraction).
 - **Extract** — LLM-powered structured extraction against a user-supplied JSON Schema.
 
-Crawl and large batch jobs run asynchronously on a Redis-backed worker queue; scrape/map/extract
-can run inline for low latency.
+Crawl jobs run asynchronously as in-process background tasks with their state in
+SQLite; scrape/map/extract run inline for low latency. No external queue or
+worker process is required.
 
 ## Architecture
 
 ```
  API (FastAPI)
    │
-   ├── /scrape   ── inline ──┐
-   ├── /map      ── inline ──┤
-   ├── /extract  ── inline ──┤
-   └── /crawl    ── enqueue ─┴─> Redis (arq) ─> Worker
-                                                  │
+   ├── /scrape   ── inline ─────┐
+   ├── /map      ── inline ─────┤
+   ├── /extract  ── inline ─────┤
+   └── /crawl    ── background task ─> SQLite (job state)
+                                          │
    Fetcher (httpx | Playwright) ─> Cleaner (trafilatura/readability ─> markdown)
-                                                  │
-                                          Extractor (LLM + JSON schema)
+                                          │
+                                  Extractor (LLM + JSON schema)
 ```
 
 ## Quickstart
@@ -36,20 +37,15 @@ pip install -e ".[dev]"
 playwright install chromium      # only needed for JS rendering
 
 # 2. Configure
-cp .env.example .env             # set HF_API_KEY, HF_ENDPOINT_URL, REDIS_URL, etc.
+cp .env.example .env             # set HF_API_KEY, HF_ENDPOINT_URL, etc.
 
-# 3. Run Redis (for crawl jobs)
-docker run -p 6379:6379 redis:7
-
-# 4. Start the API
+# 3. Start the API (crawl jobs run in-process — no worker needed)
 uvicorn app.main:app --reload
-
-# 5. Start a worker (separate terminal, for crawl jobs)
-arq app.workers.crawl_worker.WorkerSettings
 ```
 
-Or just `docker compose up` — this now brings up Redis, the API (`localhost:8000`),
-the crawl worker, **and the frontend at `localhost:3000`**.
+Or just `docker compose up` — this brings up the API (`localhost:8000`) and the
+frontend (`localhost:3000`). Redis is included but optional: it backs only the
+opt-in response cache and API-key rate limiting.
 
 > **Config note:** SiloCrawl runs an open-source LLM (`openai/gpt-oss-120b`) through a
 > HuggingFace Inference Endpoint — set `HF_API_KEY` and `HF_ENDPOINT_URL` in `.env`

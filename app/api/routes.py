@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 from app.core import telemetry
 from app.core.auth import require_api_key
 from app.core.config import get_settings
-from app.db import crawl_store
 from app.db.base import session_scope
 from app.db.models import TelemetryEvent
 from app.models.schemas import (
@@ -30,13 +29,13 @@ from app.loop import benchmark as benchmark_loop
 from app.loop import experiments, memory, orchestrator, prompts
 from app.loop.orchestrator import SCRAPE_STEPS
 from app.services import (
+    crawl_runner,
     documents,
     evaluator,
     extractor,
     jobstore,
     knowledge,
     mapper,
-    queue,
     scraper,
     verifier,
 )
@@ -180,13 +179,10 @@ async def document_upload_endpoint(
 
 @router.post("/crawl", response_model=CrawlJob, status_code=202)
 async def crawl_endpoint(req: CrawlRequest):
-    """Enqueue an async crawl job. Poll /crawl/{id} for status + results."""
+    """Start an async crawl job. Runs in-process; poll /crawl/{id} for status."""
     job_id = uuid.uuid4().hex
-    await jobstore.create(job_id)
-    pool = await queue.get_arq_pool()
-    await pool.enqueue_job("run_crawl", job_id, req.model_dump_json())
-    job = await jobstore.get(job_id)
-    assert job
+    job = await jobstore.create(job_id, url=str(req.url))
+    crawl_runner.start(job_id, req)
     return job
 
 
@@ -302,8 +298,7 @@ async def knowledge_endpoint(domain: str):
 
 @router.get("/crawl/{job_id}", response_model=CrawlJob)
 async def crawl_status(job_id: str):
-    # Live progress comes from Redis; fall back to SQLite for jobs past the TTL.
-    job = await jobstore.get(job_id) or await crawl_store.get_crawl_job(job_id)
+    job = await jobstore.get(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
     return job

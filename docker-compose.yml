@@ -1,25 +1,17 @@
 services:
+  # Optional: crawl jobs now run in-process, so Redis is only used by the
+  # opt-in response cache and API-key rate limiting (both off by default).
+  # Drop this service and the api's REDIS_URL/depends_on if you use neither.
   redis:
     image: redis:7
-    # Loopback only: the api/worker reach Redis over the compose network; the
-    # host mapping exists purely for local dev (uvicorn/arq outside Docker).
-    # Never publish an unauthenticated Redis on a network interface.
+    # Loopback only: the api reaches Redis over the compose network; the host
+    # mapping exists purely for local dev (uvicorn outside Docker).
+    # Never publish an unauthenticated Redis on a public network interface.
     ports: ["127.0.0.1:6379:6379"]
 
   api:
     build: .
     ports: ["8000:8000"]
-    env_file: .env
-    environment:
-      REDIS_URL: redis://redis:6379
-      DATABASE_URL: sqlite+aiosqlite:////data/silocrawl.db
-    volumes:
-      - silodata:/data
-    depends_on: [redis]
-
-  worker:
-    build: .
-    command: arq app.workers.crawl_worker.WorkerSettings
     env_file: .env
     environment:
       REDIS_URL: redis://redis:6379

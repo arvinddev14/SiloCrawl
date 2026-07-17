@@ -1,7 +1,8 @@
-"""Durable crawl-job storage.
+"""Durable crawl-job storage (SQLite).
 
-Mirrors finished crawl jobs into SQLite so they survive past Redis's 24h TTL.
-The API reads Redis first (live progress) and falls back here for old jobs.
+The system of record for crawl jobs: created queued, updated as the in-process
+runner makes progress, and read back by the status endpoint. No TTL — jobs
+persist for as long as the database keeps them.
 """
 from __future__ import annotations
 
