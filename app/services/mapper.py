@@ -8,7 +8,7 @@ from selectolax.parser import HTMLParser
 
 from app.core.config import get_settings
 from app.models.schemas import MapRequest, MapResult
-from app.services import cleaner, fetcher
+from app.services import fetcher
 
 settings = get_settings()
 
@@ -43,8 +43,9 @@ async def map_site(req: MapRequest) -> MapResult:
     found: set[str] = set(await _from_sitemap(base))
 
     # Always include homepage links as a fallback / supplement.
+    # Goes through fetch() so robots.txt + politeness apply (best-effort anyway).
     try:
-        resp = await fetcher.fetch_static(base)
+        resp = await fetcher.fetch(base)
         tree = HTMLParser(resp.html)
         from app.services.cleaner import _extract_links
 

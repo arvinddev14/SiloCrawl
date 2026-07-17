@@ -75,13 +75,13 @@ job = httpx.post("http://localhost:8000/v1/crawl", json={
 
 while True:
     status = httpx.get(
-        f"http://localhost:8000/v1/crawl/{job['job_id']}"
+        f"http://localhost:8000/v1/crawl/{job['id']}"
     ).json()
     if status["status"] in ("completed", "failed"):
         break
     time.sleep(2)
 
-print(f"Crawled {len(status.get('pages', []))} pages")`,
+print(f"Crawled {len(status.get('data', []))} pages")`,
   },
   {
     label: "cURL",
@@ -104,16 +104,16 @@ const MAP_TABS = [
 
 resp = httpx.post("http://localhost:8000/v1/map", json={
     "url": "https://example.com",
-    "max_urls": 100
+    "limit": 100
 })
-print(resp.json()["urls"])`,
+print(resp.json()["links"])`,
   },
   {
     label: "cURL",
     language: "bash",
     code: `curl -X POST http://localhost:8000/v1/map \\
   -H "content-type: application/json" \\
-  -d '{"url": "https://example.com", "max_urls": 100}'`,
+  -d '{"url": "https://example.com", "limit": 100}'`,
   },
 ];
 

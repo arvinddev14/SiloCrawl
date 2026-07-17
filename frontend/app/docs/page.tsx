@@ -33,7 +33,7 @@ const endpoints: EndpointDoc[] = [
       {
         name: "formats",
         type: "array<string>",
-        description: 'Output formats. One or more of: "markdown", "html", "text", "links". Defaults to ["markdown"].',
+        description: 'Output formats. One or more of: "markdown", "html", "text", "links", "screenshot". Defaults to ["markdown"]. Requesting "screenshot" renders the page in a headless browser.',
       },
       {
         name: "render_js",
@@ -46,6 +46,11 @@ const endpoints: EndpointDoc[] = [
       { name: "html", type: "string | null", description: "Cleaned HTML content." },
       { name: "text", type: "string | null", description: "Plain text content." },
       { name: "links", type: "string[]", description: "All absolute URLs found on the page." },
+      {
+        name: "screenshot",
+        type: "string | null",
+        description: "Base64-encoded full-page PNG (when requested).",
+      },
       {
         name: "metadata",
         type: "object",
@@ -69,18 +74,29 @@ const endpoints: EndpointDoc[] = [
     request: [
       { name: "url", type: "string", required: true, description: "The domain root URL to map." },
       {
-        name: "max_urls",
+        name: "limit",
         type: "integer",
-        description: "Maximum number of URLs to return. Defaults to 500.",
+        description: "Maximum number of URLs to return. Defaults to 5000 (max 50000).",
+      },
+      {
+        name: "include_subdomains",
+        type: "boolean",
+        description: "Include URLs on subdomains of the target domain. Defaults to false.",
+      },
+      {
+        name: "search",
+        type: "string",
+        description: "Only return URLs containing this substring (case-insensitive).",
       },
     ],
     response: [
-      { name: "urls", type: "string[]", description: "List of discovered URLs on the domain." },
-      { name: "source_url", type: "string", description: "The normalised root URL that was mapped." },
+      { name: "base_url", type: "string", description: "The normalised root URL that was mapped." },
+      { name: "links", type: "string[]", description: "Sorted list of discovered URLs on the domain." },
+      { name: "count", type: "integer", description: "Number of URLs returned." },
     ],
     example: `curl -X POST http://localhost:8000/v1/map \\
   -H "content-type: application/json" \\
-  -d '{"url": "https://example.com", "max_urls": 100}'`,
+  -d '{"url": "https://example.com", "limit": 100}'`,
   },
   {
     id: "extract",
@@ -148,17 +164,43 @@ const endpoints: EndpointDoc[] = [
       {
         name: "max_pages",
         type: "integer",
-        description: "Maximum number of pages to crawl. Defaults to 100.",
+        description: "Maximum number of pages to crawl. Defaults to 100 (max 10000).",
       },
-      { name: "max_depth", type: "integer", description: "Maximum link depth. Defaults to 3." },
+      { name: "max_depth", type: "integer", description: "Maximum link depth. Defaults to 3 (max 10)." },
       {
         name: "formats",
         type: "array<string>",
         description: 'Output formats for each page. Defaults to ["markdown"].',
       },
+      { name: "render_js", type: "boolean", description: "Render JavaScript on every page. Defaults to false." },
+      {
+        name: "include_paths",
+        type: "array<string>",
+        description: "Regex patterns — only URLs matching at least one are followed.",
+      },
+      {
+        name: "exclude_paths",
+        type: "array<string>",
+        description: "Regex patterns — URLs matching any are skipped.",
+      },
+      {
+        name: "allow_external",
+        type: "boolean",
+        description: "Follow links to external domains. Defaults to false.",
+      },
     ],
     response: [
-      { name: "job_id", type: "string", description: "UUID for the crawl job. Use this to poll status." },
+      { name: "id", type: "string", description: "UUID for the crawl job. Use this to poll status." },
+      { name: "status", type: "string", description: '"queued", "running", "completed", or "failed".' },
+      { name: "total", type: "integer", description: "Total pages discovered (populated as the job runs)." },
+      { name: "completed", type: "integer", description: "Number of pages scraped so far." },
+      { name: "data", type: "ScrapeResult[]", description: "Scraped pages (populated when the job completes)." },
+      {
+        name: "failed_pages",
+        type: "object[]",
+        description: "Pages that failed, each as { url, error }.",
+      },
+      { name: "error", type: "string | null", description: "Job-level error message, if the job failed." },
     ],
     example: `# 1. Start the crawl
 curl -X POST http://localhost:8000/v1/crawl \\

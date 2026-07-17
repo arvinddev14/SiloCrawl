@@ -1,0 +1,58 @@
+# SiloLoop model configuration — Agent -> Router -> Provider.
+#
+# Every AI agent resolves its model through the Model Router by role name.
+# To switch an agent to a different open-source model later, change its alias
+# under `agents:` and add a matching block under `models:`. No code changes.
+#
+# ${VAR} placeholders expand from the environment / .env.
+#
+# Cross-model experiments (INC-B14): POST /v1/experiments/run trials candidate
+# aliases for an agent over the same tasks; winners can be promoted at runtime
+# (stored in the model_promotions table, applied to routing only when
+# APPLY_MODEL_PROMOTIONS=true). This file remains the source of truth for which
+# models exist — a promotion referencing an alias not defined here is ignored.
+
+agents:
+  default:   gpt-oss-120b
+  planner:   gpt-oss-120b   # -> qwen3           (switches on at INC-B9)
+  extractor: gpt-oss-120b
+  verifier:  gpt-oss-120b   # -> llama-3.3        (INC-B3)
+  repair:    gpt-oss-120b
+  ocr:       gpt-oss-120b   # -> qwen2.5-vl       (INC-B8)
+  coder:     gpt-oss-120b   # -> deepseek-coder   (INC-B12)
+
+models:
+  gpt-oss-120b:
+    provider: openai_compat
+    model: openai/gpt-oss-120b
+    endpoint: ${HF_ENDPOINT_URL}
+    api_key: ${HF_API_KEY}
+    max_tokens: 4096
+
+  # --- Target open-source models (SiloLoop_Architecture.md "Suggested Models").
+  #     Uncomment + provide an endpoint when the matching agent lands; the router
+  #     picks them up with no code changes. ---
+  # llama-3.3:
+  #   provider: openai_compat
+  #   model: meta-llama/Llama-3.3-70B-Instruct
+  #   endpoint: ${HF_ENDPOINT_URL_LLAMA}
+  #   api_key: ${HF_API_KEY}
+  #   max_tokens: 4096
+  # qwen3:
+  #   provider: openai_compat
+  #   model: Qwen/Qwen3-235B-A22B-Instruct
+  #   endpoint: ${HF_ENDPOINT_URL_QWEN}
+  #   api_key: ${HF_API_KEY}
+  #   max_tokens: 4096
+  # qwen2.5-vl:
+  #   provider: openai_compat
+  #   model: Qwen/Qwen2.5-VL-72B-Instruct
+  #   endpoint: ${HF_ENDPOINT_URL_QWEN_VL}
+  #   api_key: ${HF_API_KEY}
+  #   max_tokens: 4096
+  # deepseek-coder:
+  #   provider: openai_compat
+  #   model: deepseek-ai/DeepSeek-Coder-V2-Instruct
+  #   endpoint: ${HF_ENDPOINT_URL_DEEPSEEK}
+  #   api_key: ${HF_API_KEY}
+  #   max_tokens: 4096

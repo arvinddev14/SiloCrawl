@@ -36,7 +36,7 @@ pip install -e ".[dev]"
 playwright install chromium      # only needed for JS rendering
 
 # 2. Configure
-cp .env.example .env             # set ANTHROPIC_API_KEY, REDIS_URL, etc.
+cp .env.example .env             # set HF_API_KEY, HF_ENDPOINT_URL, REDIS_URL, etc.
 
 # 3. Run Redis (for crawl jobs)
 docker run -p 6379:6379 redis:7
@@ -48,7 +48,12 @@ uvicorn app.main:app --reload
 arq app.workers.crawl_worker.WorkerSettings
 ```
 
-Or just `docker compose up`.
+Or just `docker compose up` — this now brings up Redis, the API (`localhost:8000`),
+the crawl worker, **and the frontend at `localhost:3000`**.
+
+> **Config note:** SiloCrawl runs an open-source LLM (`openai/gpt-oss-120b`) through a
+> HuggingFace Inference Endpoint — set `HF_API_KEY` and `HF_ENDPOINT_URL` in `.env`
+> (see `.env.example`). `.env` is gitignored; rotate your key if it has ever been shared.
 
 ## Example
 
