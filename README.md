@@ -78,6 +78,28 @@ curl -X POST localhost:8000/v1/extract \
   }'
 ```
 
+## Security
+
+Safe-by-default for self-hosting, but read this before exposing the API
+beyond localhost:
+
+- **Turn auth on for any network-exposed deployment**: set `AUTH_ENABLED=true`
+  and `API_KEYS=<comma-separated keys>`. Without it, anyone who can reach the
+  port can scrape (and pay for LLM calls) through your server.
+- **SSRF guard (on by default)**: every outbound fetch — scrape, map, extract,
+  crawl, documents, robots.txt, and each redirect hop — refuses URLs that
+  resolve to loopback, private, or link-local addresses (cloud metadata
+  endpoints included). Rendered pages get the same check on subresources. Set
+  `ALLOW_PRIVATE_NETWORKS=true` only to deliberately scrape your own internal
+  network.
+- **Size caps**: page bodies are capped at `FETCH_MAX_BYTES` (10 MB) and
+  documents at `DOCUMENT_MAX_BYTES` (25 MB), enforced while streaming — a
+  hostile server can't balloon memory.
+- **Redis** ships unauthenticated; docker-compose publishes it on loopback
+  only. Never map it to a public interface.
+- Report vulnerabilities via GitHub issues (or privately via the email on the
+  profile) — please include reproduction steps.
+
 ## License
 
 MIT — see LICENSE.

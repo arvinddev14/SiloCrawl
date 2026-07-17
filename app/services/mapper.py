@@ -8,7 +8,7 @@ from selectolax.parser import HTMLParser
 
 from app.core.config import get_settings
 from app.models.schemas import MapRequest, MapResult
-from app.services import fetcher
+from app.services import fetcher, netguard
 
 settings = get_settings()
 
@@ -25,12 +25,14 @@ async def _from_sitemap(base: str) -> list[str]:
     root = f"{urlparse(base).scheme}://{urlparse(base).netloc}"
     urls: list[str] = []
     async with httpx.AsyncClient(
-        timeout=settings.request_timeout, headers={"User-Agent": settings.user_agent}
+        timeout=settings.request_timeout,
+        headers={"User-Agent": settings.user_agent},
+        event_hooks=netguard.event_hooks(),
     ) as client:
         for path in ("/sitemap.xml", "/sitemap_index.xml"):
             try:
                 r = await client.get(root + path, follow_redirects=True)
-                if r.status_code == 200 and "<urlset" in r.text or "<sitemapindex" in r.text:
+                if r.status_code == 200 and ("<urlset" in r.text or "<sitemapindex" in r.text):
                     tree = HTMLParser(r.text)
                     urls += [n.text() for n in tree.css("loc") if n.text()]
             except httpx.HTTPError:

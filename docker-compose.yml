@@ -1,7 +1,10 @@
 services:
   redis:
     image: redis:7
-    ports: ["6379:6379"]
+    # Loopback only: the api/worker reach Redis over the compose network; the
+    # host mapping exists purely for local dev (uvicorn/arq outside Docker).
+    # Never publish an unauthenticated Redis on a network interface.
+    ports: ["127.0.0.1:6379:6379"]
 
   api:
     build: .

@@ -7,13 +7,18 @@ static (httpx) or rendered (Playwright) path.
 from __future__ import annotations
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import get_settings
-from app.services import robots
+from app.services import netguard, robots
+from app.services.netguard import PrivateAddressError
 from app.services.throttle import throttle
 
 settings = get_settings()
+
+
+class FetchTooLargeError(Exception):
+    """The response body exceeds fetch_max_bytes."""
 
 
 class FetchResponse:
@@ -45,6 +50,7 @@ class _wait_retry_after(wait_exponential):
 @retry(
     stop=stop_after_attempt(settings.max_retries),
     wait=_wait_retry_after(multiplier=0.5, max=8),
+    retry=retry_if_not_exception_type((PrivateAddressError, FetchTooLargeError)),
     reraise=True,
 )
 async def fetch_static(
@@ -63,10 +69,38 @@ async def fetch_static(
         follow_redirects=True,
         timeout=settings.request_timeout,
         headers=headers,
+        event_hooks=netguard.event_hooks(),
     ) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
-        return FetchResponse(str(resp.url), resp.text, resp.status_code)
+        async with client.stream("GET", url) as resp:
+            resp.raise_for_status()
+            body = await _read_capped(resp, settings.fetch_max_bytes)
+        text = body.decode(resp.charset_encoding or "utf-8", errors="replace")
+        return FetchResponse(str(resp.url), text, resp.status_code)
+
+
+async def _read_capped(resp: httpx.Response, limit: int) -> bytes:
+    """Collect a streamed body, refusing to buffer more than *limit* bytes."""
+    declared = resp.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > limit:
+        raise FetchTooLargeError(f"Response declares {declared} bytes; limit is {limit}.")
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in resp.aiter_bytes():
+        total += len(chunk)
+        if total > limit:
+            raise FetchTooLargeError(f"Response exceeded the {limit}-byte limit.")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+async def _guard_route(route) -> None:  # noqa: ANN001 - playwright.Route
+    """Subresource SSRF guard: a rendered page must not pull from private hosts."""
+    try:
+        await netguard.check_url(route.request.url)
+    except PrivateAddressError:
+        await route.abort("blockedbyclient")
+        return
+    await route.continue_()
 
 
 async def fetch_rendered(url: str, capture_screenshot: bool = False) -> FetchResponse:
@@ -74,10 +108,12 @@ async def fetch_rendered(url: str, capture_screenshot: bool = False) -> FetchRes
     package works without Playwright installed when render_js is never used."""
     from playwright.async_api import async_playwright
 
+    await netguard.check_url(url)
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         try:
             page = await browser.new_page(user_agent=settings.user_agent)
+            await page.route("**/*", _guard_route)
             resp = await page.goto(
                 url, wait_until="networkidle", timeout=settings.request_timeout * 1000
             )

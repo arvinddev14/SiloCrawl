@@ -12,6 +12,7 @@ from urllib.robotparser import RobotFileParser
 import httpx
 
 from app.core.config import get_settings
+from app.services import netguard
 
 settings = get_settings()
 
@@ -42,6 +43,7 @@ async def _get_parser(root: str) -> RobotFileParser | None:
             timeout=10.0,
             follow_redirects=True,
             headers={"User-Agent": settings.user_agent},
+            event_hooks=netguard.event_hooks(),
         ) as client:
             resp = await client.get(f"{root}/robots.txt")
         if resp.status_code == 200:
