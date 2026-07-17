@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.core import telemetry
 from app.core.auth import require_api_key
+from app.core.config import get_settings
 from app.db import crawl_store
 from app.db.base import session_scope
 from app.db.models import TelemetryEvent
@@ -40,6 +41,7 @@ from app.services import (
     verifier,
 )
 from app.services import repair as repair_service
+from app.services.netguard import PrivateAddressError
 from app.services.robots import RobotsDisallowedError
 
 logger = logging.getLogger("silocrawl")
@@ -54,7 +56,7 @@ async def scrape_endpoint(req: ScrapeRequest, loop: bool = False, benchmark: boo
             return await orchestrator.run(req, steps=SCRAPE_STEPS, benchmark=benchmark)
         async with telemetry.track("scrape", url=str(req.url)):
             return await scraper.scrape(req)
-    except RobotsDisallowedError as e:
+    except (RobotsDisallowedError, PrivateAddressError) as e:
         raise HTTPException(403, str(e)) from e
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, f"Scrape failed: {e}") from e
@@ -65,6 +67,8 @@ async def map_endpoint(req: MapRequest):
     try:
         async with telemetry.track("map", url=str(req.url)):
             return await mapper.map_site(req)
+    except PrivateAddressError as e:
+        raise HTTPException(403, str(e)) from e
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, f"Map failed: {e}") from e
 
@@ -93,7 +97,7 @@ async def extract_endpoint(
                 handle.confidence = result.confidence
                 return result
             return await extractor.extract(req)
-    except RobotsDisallowedError as e:
+    except (RobotsDisallowedError, PrivateAddressError) as e:
         raise HTTPException(403, str(e)) from e
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, f"Extract failed: {e}") from e
@@ -128,7 +132,7 @@ async def document_endpoint(req: DocumentRequest, verify: bool = False, repair: 
             return await _document_result(
                 text, meta, req.json_schema, req.prompt, verify, repair, handle
             )
-    except RobotsDisallowedError as e:
+    except (RobotsDisallowedError, PrivateAddressError) as e:
         raise HTTPException(403, str(e)) from e
     except documents.DocumentTooLargeError as e:
         raise HTTPException(413, str(e)) from e
@@ -155,7 +159,9 @@ async def document_upload_endpoint(
             schema_dict = json.loads(extract_schema)
         except json.JSONDecodeError as e:
             raise HTTPException(400, "'schema' must be valid JSON.") from e
-    raw = await file.read()
+    # Read at most limit+1 bytes so an oversized upload is refused by process()
+    # without ever buffering the whole thing.
+    raw = await file.read(get_settings().document_max_bytes + 1)
     try:
         async with telemetry.track("document", url=file.filename) as handle:
             text, meta = await documents.process(

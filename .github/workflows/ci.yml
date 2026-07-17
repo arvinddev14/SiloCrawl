@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege for the workflow token; the llm-review job widens its own.
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend (Python ${{ matrix.python-version }})

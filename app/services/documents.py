@@ -19,7 +19,7 @@ import httpx
 
 from app.core.config import get_settings
 from app.models.schemas import OutputFormat
-from app.services import cleaner, robots
+from app.services import cleaner, netguard, robots
 from app.services.throttle import throttle
 
 logger = logging.getLogger("silocrawl")
@@ -301,10 +301,28 @@ async def download(url: str) -> tuple[bytes, str | None]:
         follow_redirects=True,
         timeout=settings.request_timeout,
         headers={"User-Agent": settings.user_agent},
+        event_hooks=netguard.event_hooks(),
     ) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
-        return resp.content, resp.headers.get("content-type")
+        # Stream with a cap: the size check must happen while downloading, not
+        # after the whole body already sits in memory.
+        async with client.stream("GET", url) as resp:
+            resp.raise_for_status()
+            limit = settings.document_max_bytes
+            declared = resp.headers.get("content-length", "")
+            if declared.isdigit() and int(declared) > limit:
+                raise DocumentTooLargeError(
+                    f"Document declares {declared} bytes; limit is {limit}."
+                )
+            chunks: list[bytes] = []
+            total = 0
+            async for chunk in resp.aiter_bytes():
+                total += len(chunk)
+                if total > limit:
+                    raise DocumentTooLargeError(
+                        f"Document exceeded the {limit}-byte limit."
+                    )
+                chunks.append(chunk)
+        return b"".join(chunks), resp.headers.get("content-type")
 
 
 async def process(

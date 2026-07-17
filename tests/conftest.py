@@ -6,6 +6,18 @@ from app.db import init_db
 from app.db.base import get_engine, get_sessionmaker
 from app.llm import router as router_module
 from app.main import app
+from app.services import netguard
+
+
+@pytest.fixture(autouse=True)
+def public_dns(monkeypatch):
+    """Keep tests hermetic: the SSRF guard must never do real DNS lookups.
+    Everything resolves public unless a test re-patches to a private address."""
+
+    async def fake_resolve(host: str) -> list[str]:
+        return ["93.184.216.34"]
+
+    monkeypatch.setattr(netguard, "_resolve", fake_resolve)
 
 
 @pytest.fixture

@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     )
     request_timeout: float = 30.0
     max_retries: int = 3
+    # SSRF guard: refuse URLs resolving to loopback/private/link-local addresses.
+    # Enable only to deliberately scrape hosts on your own internal network.
+    allow_private_networks: bool = False
+    fetch_max_bytes: int = 10_000_000  # cap on a fetched page body
     respect_robots: bool = True
     robots_cache_ttl: int = 3600  # seconds to cache a domain's robots.txt
     per_domain_delay: float = 1.0  # min seconds between requests to the same domain
