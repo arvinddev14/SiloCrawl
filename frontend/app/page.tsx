@@ -139,7 +139,7 @@ const features = [
     icon: "🕷️",
     title: "Crawl",
     description:
-      "Recursively follow links across a site with configurable depth and page limits. Jobs run asynchronously via Redis.",
+      "Recursively follow links across a site with configurable depth and page limits. Jobs run asynchronously in-process — poll for status and results.",
     tabs: CRAWL_TABS,
   },
   {
@@ -156,7 +156,7 @@ const stats = [
   { value: "4", label: "API endpoints" },
   { value: "Free", label: "Self-hosted" },
   { value: "LLM", label: "AI-powered extraction" },
-  { value: "async", label: "Redis-backed crawl queue" },
+  { value: "SQLite", label: "Durable job storage" },
 ];
 
 export default function Home() {
@@ -169,10 +169,6 @@ export default function Home() {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(20,184,166,0.12),transparent)]" />
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-24 md:py-36 relative">
             <div className="text-center max-w-3xl mx-auto">
-              <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs text-teal-400 mb-6">
-                <span className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse" />
-                Open source · Self-hosted
-              </div>
               <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white mb-6">
                 Power your AI agents with{" "}
                 <span className="text-teal-500">clean web data</span>

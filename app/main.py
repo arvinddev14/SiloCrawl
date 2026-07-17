@@ -11,7 +11,6 @@ from app.core.auth import require_api_key
 from app.core.telemetry import setup_logging
 from app.db import init_db
 from app.db.metrics import collect_metrics
-from app.services.queue import close_arq_pool
 
 access_logger = logging.getLogger("silocrawl.access")
 
@@ -21,7 +20,6 @@ async def lifespan(_app: FastAPI):
     setup_logging()
     await init_db()
     yield
-    await close_arq_pool()
 
 
 app = FastAPI(

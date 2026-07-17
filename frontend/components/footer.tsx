@@ -20,6 +20,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-zinc-400">
               <li><Link href="/playground" className="hover:text-white transition-colors">Playground</Link></li>
               <li><Link href="/docs" className="hover:text-white transition-colors">Docs</Link></li>
+              <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link></li>
             </ul>
           </div>
 
@@ -46,6 +47,9 @@ export function Footer() {
 
         <div className="mt-10 border-t border-zinc-800 pt-6 flex items-center justify-between">
           <p className="text-xs text-zinc-500">© 2026 SiloCrawl.</p>
+          <Link href="/privacy" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+            Privacy Policy
+          </Link>
         </div>
       </div>
     </footer>

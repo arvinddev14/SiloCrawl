@@ -2,9 +2,8 @@ import pytest
 import respx
 from httpx import Response
 
-from app.db.crawl_store import save_crawl_job
 from app.models.schemas import CrawlJob, CrawlStatus
-from app.services import fetcher, jobstore, robots
+from app.services import crawl_runner, fetcher, jobstore, robots
 
 PAGE = (
     "<html lang='en'><head><title>Hi</title>"
@@ -80,24 +79,52 @@ async def test_map_discovers_links(client, no_politeness):
     assert "https://example.com/about" in links
 
 
-async def test_crawl_status_unknown_returns_404(client, monkeypatch):
-    async def _none(_job_id):
-        return None
-
-    monkeypatch.setattr(jobstore, "get", _none)  # simulate Redis miss
+async def test_crawl_status_unknown_returns_404(client):
     resp = await client.get("/v1/crawl/does-not-exist")
     assert resp.status_code == 404
 
 
-async def test_crawl_status_falls_back_to_db(client, monkeypatch):
-    async def _none(_job_id):
-        return None
-
-    monkeypatch.setattr(jobstore, "get", _none)  # Redis expired the job
-    await save_crawl_job(
+async def test_crawl_status_returns_persisted_job(client):
+    await jobstore.save(
         CrawlJob(id="j1", status=CrawlStatus.completed, total=1, completed=1),
         url="https://example.com",
     )
     resp = await client.get("/v1/crawl/j1")
     assert resp.status_code == 200
     assert resp.json()["id"] == "j1"
+
+
+async def test_crawl_start_returns_queued_and_launches(client, monkeypatch):
+    started: list[str] = []
+
+    def _fake_start(job_id, req):
+        started.append(job_id)  # don't spawn a real crawl in the test
+
+    monkeypatch.setattr(crawl_runner, "start", _fake_start)
+    resp = await client.post("/v1/crawl", json={"url": "https://example.com"})
+    assert resp.status_code == 202
+    body = resp.json()
+    assert body["status"] == "queued"
+    assert started == [body["id"]]
+    # the queued job is immediately persisted and pollable
+    got = await client.get(f"/v1/crawl/{body['id']}")
+    assert got.status_code == 200
+
+
+async def test_crawl_runner_persists_completion(temp_db, monkeypatch):
+    from app.models.schemas import CrawlRequest, PageMetadata, ScrapeResult
+
+    async def _fake_crawl(req, on_progress=None):
+        page = ScrapeResult(metadata=PageMetadata(source_url=str(req.url)))
+        if on_progress:
+            on_progress(1, 1, page)
+        return [page], []
+
+    monkeypatch.setattr(crawl_runner.crawler, "crawl", _fake_crawl)
+    await jobstore.create("run1", url="https://example.com")
+    await crawl_runner.run_job("run1", CrawlRequest(url="https://example.com"))
+
+    job = await jobstore.get("run1")
+    assert job.status == CrawlStatus.completed
+    assert job.completed == 1
+    assert len(job.data) == 1
