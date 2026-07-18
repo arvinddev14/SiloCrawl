@@ -66,9 +66,12 @@ browser console shows a CORS error, re-check the origin string matches exactly
 
 ## Going to production (checklist)
 
-- **Auth on:** set `AUTH_ENABLED=true` and `API_KEYS=<comma-separated>` on
-  Render, and `NEXT_PUBLIC_API_KEY=<one of them>` on Vercel. Without this,
-  anyone who finds the API URL can run jobs (and spend your LLM budget).
+- **Auth on:** in Render → your service → **Environment**, set `AUTH_ENABLED=true`
+  and add `API_KEYS` = one or more comma-separated secrets (generate one with
+  `python -c "import secrets; print(secrets.token_urlsafe(32))"`). Then on Vercel
+  set `NEXT_PUBLIC_API_KEY` to one of those keys and redeploy the frontend.
+  Without this, anyone who finds the API URL can run jobs (and spend your LLM
+  budget). Leave `AUTH_ENABLED` unset/false and `API_KEYS` is ignored.
 - **Persistent disk** on Render if you rely on stored jobs / the deletion log.
 - **Custom domains:** add them on both platforms, then add the frontend's
   domain to `CORS_ALLOW_ORIGINS`.
