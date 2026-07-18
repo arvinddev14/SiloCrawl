@@ -79,6 +79,12 @@ async def test_map_discovers_links(client, no_politeness):
     assert "https://example.com/about" in links
 
 
+async def test_cors_allows_configured_origin(client):
+    # The default configured origin should get a CORS allow header back.
+    resp = await client.get("/health", headers={"Origin": "http://localhost:3000"})
+    assert resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
 async def test_crawl_status_unknown_returns_404(client):
     resp = await client.get("/v1/crawl/does-not-exist")
     assert resp.status_code == 404

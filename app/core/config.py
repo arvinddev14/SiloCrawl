@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     telemetry_enabled: bool = True
     log_level: str = "INFO"
 
+    # CORS: comma-separated origins allowed to call the API from a browser.
+    # Add your deployed frontend origin here (e.g. https://your-app.vercel.app).
+    cors_allow_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+
     # Auth (off by default — self-hosting stays zero-config)
     auth_enabled: bool = False
     api_keys: str = ""  # comma-separated accepted keys
