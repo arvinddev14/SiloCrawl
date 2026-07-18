@@ -47,3 +47,38 @@ async def get_crawl_job(job_id: str) -> CrawlJob | None:
         if record is None:
             return None
         return CrawlJob.model_validate(record.payload)
+
+
+async def list_crawl_jobs(limit: int = 100) -> list[dict]:
+    """Lightweight index of stored jobs (no page content) for data-subject
+    access / portability. Full content is available via get_crawl_job."""
+    async with session_scope() as session:
+        rows = (
+            await session.execute(
+                select(CrawlJobRecord)
+                .order_by(CrawlJobRecord.created_at.desc())
+                .limit(limit)
+            )
+        ).scalars().all()
+    return [
+        {
+            "id": r.id,
+            "url": r.url,
+            "status": r.status,
+            "total": r.total,
+            "completed": r.completed,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+        }
+        for r in rows
+    ]
+
+
+async def delete_crawl_job(job_id: str) -> bool:
+    """Erase a crawl job and the content it captured. False if it wasn't there."""
+    async with session_scope() as session:
+        record = await session.get(CrawlJobRecord, job_id)
+        if record is None:
+            return False
+        await session.delete(record)
+    return True

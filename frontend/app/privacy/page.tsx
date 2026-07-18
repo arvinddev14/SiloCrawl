@@ -143,16 +143,21 @@ const sections: Section[] = [
       <>
         <p>
           Because SiloCrawl stores its state in a local SQLite database that the operator
-          controls, an operator can satisfy data-subject requests directly:
+          controls, an operator can satisfy data-subject requests directly through the API:
         </p>
         <ul className="mt-3 list-disc space-y-2 pl-5">
           <li>
-            <strong className="text-zinc-200">Access &amp; portability</strong> — stored crawl
-            jobs and telemetry can be exported as JSON.
+            <strong className="text-zinc-200">Access &amp; portability</strong> — list stored
+            crawl jobs with <code className="text-teal-400">GET /v1/crawl</code>, export a job and
+            the content it captured with{" "}
+            <code className="text-teal-400">GET /v1/crawl/{"{id}"}</code>, and export raw
+            telemetry with <code className="text-teal-400">GET /v1/telemetry</code> — all as JSON.
           </li>
           <li>
-            <strong className="text-zinc-200">Deletion</strong> — a crawl job (and the content it
-            captured) can be deleted by its id; telemetry can be purged by time window.
+            <strong className="text-zinc-200">Deletion</strong> — erase a crawl job and its
+            captured content with <code className="text-teal-400">DELETE /v1/crawl/{"{id}"}</code>;
+            purge telemetry by time window with{" "}
+            <code className="text-teal-400">DELETE /v1/telemetry</code>.
           </li>
           <li>
             <strong className="text-zinc-200">Objection / restriction</strong> — telemetry can be

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from app.core import telemetry
 from app.core.auth import require_api_key
 from app.core.config import get_settings
+from app.db import crawl_store, telemetry_store
 from app.db.base import session_scope
 from app.db.models import TelemetryEvent
 from app.models.schemas import (
@@ -186,6 +187,21 @@ async def crawl_endpoint(req: CrawlRequest):
     return job
 
 
+@router.get("/crawl")
+async def list_crawl_jobs_endpoint(limit: int = 100):
+    """Index of stored crawl jobs (data-subject access). Full content per job
+    is available from GET /crawl/{id}."""
+    return {"jobs": await crawl_store.list_crawl_jobs(limit)}
+
+
+@router.delete("/crawl/{job_id}")
+async def delete_crawl_job_endpoint(job_id: str):
+    """Erase a crawl job and the content it captured (right to deletion)."""
+    if not await crawl_store.delete_crawl_job(job_id):
+        raise HTTPException(404, "Job not found")
+    return {"id": job_id, "deleted": True}
+
+
 class PromptUpdate(BaseModel):
     template: str
 
@@ -232,6 +248,21 @@ async def events_endpoint(batch: ClientEventBatch):
 async def ux_endpoint(hours: int = 24):
     """Aggregated frontend usage signals + rule-based UX recommendations."""
     return await evaluator.ux_report(hours)
+
+
+@router.get("/telemetry")
+async def telemetry_export_endpoint(hours: int = 0, limit: int = 5000):
+    """Export raw telemetry events as JSON (data-subject access). hours=0 = all."""
+    events = await telemetry_store.export_events(hours=hours, limit=limit)
+    return {"count": len(events), "events": events}
+
+
+@router.delete("/telemetry")
+async def telemetry_purge_endpoint(older_than_hours: int | None = None):
+    """Purge telemetry by time window (right to erasure). Omit the window to
+    delete all telemetry events."""
+    removed = await telemetry_store.purge_events(older_than_hours=older_than_hours)
+    return {"deleted": removed}
 
 
 @router.get("/benchmarks")
