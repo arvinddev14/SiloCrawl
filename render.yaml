@@ -1,0 +1,54 @@
+# Render blueprint for the SiloCrawl backend (FastAPI).
+# Deploy: Render Dashboard -> New -> Blueprint -> pick this repo. Render reads
+# this file and provisions the service. The Next.js frontend goes to Vercel
+# separately (see DEPLOY.md).
+#
+# Crawl jobs run in-process, so no Redis/worker is needed.
+
+services:
+  - type: web
+    name: silocrawl-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free            # free tier has NO persistent disk (see note below)
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # SQLite location. On the free tier this lives on the ephemeral container
+      # filesystem and resets on every deploy/restart. For durable storage
+      # (jobs, telemetry, deletion log) upgrade the plan and enable the `disk`
+      # block below, then set this to sqlite+aiosqlite:////data/silocrawl.db.
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:////tmp/silocrawl.db
+
+      # LLM (open-source gpt-oss via a HuggingFace endpoint). Secrets: set the
+      # values in the Render dashboard, not here.
+      - key: HF_API_KEY
+        sync: false
+      - key: HF_ENDPOINT_URL
+        sync: false
+
+      # Allow your deployed frontend origin through CORS. Set this to your
+      # Vercel URL after the frontend deploys, e.g. https://silocrawl.vercel.app
+      - key: CORS_ALLOW_ORIGINS
+        sync: false
+
+      # Safe defaults; override in the dashboard if needed.
+      - key: RESPECT_ROBOTS
+        value: "true"
+      - key: ALLOW_PRIVATE_NETWORKS
+        value: "false"
+      - key: TELEMETRY_ENABLED
+        value: "true"
+      # Turn auth on for a public deployment: set AUTH_ENABLED=true and provide
+      # API_KEYS (comma-separated). Then set NEXT_PUBLIC_API_KEY on Vercel.
+      - key: AUTH_ENABLED
+        value: "false"
+
+    # --- Durable SQLite (paid plans only) ---------------------------------
+    # Uncomment, switch `plan` above to `starter`, and set DATABASE_URL to
+    # sqlite+aiosqlite:////data/silocrawl.db to persist data across deploys.
+    # disk:
+    #   name: silocrawl-data
+    #   mountPath: /data
+    #   sizeGB: 1

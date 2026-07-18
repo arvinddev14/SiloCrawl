@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 
 from app.api.routes import router
 from app.core.auth import require_api_key
+from app.core.config import get_settings
 from app.core.telemetry import setup_logging
 from app.db import init_db
 from app.db.metrics import collect_metrics
@@ -29,9 +30,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_cors_origins = [
+    o.strip() for o in get_settings().cors_allow_origins.split(",") if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -10,6 +10,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Emit .next/standalone for the runner stage below (see next.config.ts).
+ENV BUILD_STANDALONE=1
 RUN npm run build
 
 # --- runner: minimal image running the traced server ---
