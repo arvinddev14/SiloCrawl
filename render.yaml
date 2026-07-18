@@ -40,10 +40,15 @@ services:
         value: "false"
       - key: TELEMETRY_ENABLED
         value: "true"
-      # Turn auth on for a public deployment: set AUTH_ENABLED=true and provide
-      # API_KEYS (comma-separated). Then set NEXT_PUBLIC_API_KEY on Vercel.
+      # Auth for a public deployment. Both are `sync: false` so you own their
+      # values in the dashboard (Environment tab) and a blueprint re-sync never
+      # overwrites them. To lock the API: set AUTH_ENABLED=true and API_KEYS to
+      # one or more comma-separated secrets, then set NEXT_PUBLIC_API_KEY on
+      # Vercel to one of them. Left unset, auth stays off (API_KEYS is ignored).
       - key: AUTH_ENABLED
-        value: "false"
+        sync: false
+      - key: API_KEYS
+        sync: false
 
     # --- Durable SQLite (paid plans only) ---------------------------------
     # Uncomment, switch `plan` above to `starter`, and set DATABASE_URL to
