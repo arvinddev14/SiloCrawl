@@ -165,6 +165,13 @@ const sections: Section[] = [
           </li>
         </ul>
         <p className="mt-3">
+          Every erasure is recorded in an append-only deletion log (
+          <code className="text-teal-400">GET /v1/audit/deletions</code>) so an operator can
+          demonstrate compliance. That log stores <strong className="text-zinc-200">metadata only</strong>{" "}
+          — what was deleted, how many records, by whom, and when — never the deleted content
+          itself, so it can be retained after an erasure without re-introducing your data.
+        </p>
+        <p className="mt-3">
           If you are an end user whose data may have been collected by an organization running
           SiloCrawl, direct your request to that organization — they are the controller.
         </p>

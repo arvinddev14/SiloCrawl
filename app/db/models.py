@@ -119,6 +119,25 @@ class ModelPromotion(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
+class DeletionLog(Base):
+    """Append-only audit trail of data-subject erasures.
+
+    Records metadata only — target type, a non-personal reference id, how many
+    rows went, who asked, and when — never the deleted content itself, so the
+    log can be retained after a GDPR erasure without re-introducing the data.
+    """
+
+    __tablename__ = "deletion_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    target_type: Mapped[str] = mapped_column(String, index=True)  # crawl_job | telemetry
+    target_id: Mapped[str | None] = mapped_column(String, nullable=True)  # job id; null = bulk
+    count: Mapped[int] = mapped_column(Integer, default=0)  # rows removed
+    actor: Mapped[str | None] = mapped_column(String, nullable=True)  # hashed api-key id
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
 class PromptVersion(Base):
     __tablename__ = "prompt_versions"
 

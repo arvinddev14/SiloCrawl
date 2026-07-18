@@ -48,7 +48,10 @@ SiloCrawl ships no health features; HIPAA only matters if an operator crawls PHI
 
 Engineering implication: any table that stores personal data needs a
 **delete-by-subject** and **export-by-subject** path. Prefer keying such data so
-those operations are possible (e.g. by domain/source/job id).
+those operations are possible (e.g. by domain/source/job id). Erasures are
+recorded in `deletion_log` (`GET /v1/audit/deletions`) — **metadata only, never
+the deleted content**, so the audit trail survives a deletion without
+re-introducing the data.
 
 ## Consent (when applicable)
 
@@ -74,6 +77,7 @@ should be **opt-in or clearly disclosed**, never silently identifying.
 | Access logs (method, path, status, api_key_id hash) | stdout / operator's log sink | IP/UA only if operator adds them | Operator-defined |
 | API keys | env / config, compared timing-safe, stored hashed in logs | Yes (secret) | Lifetime of the key |
 | Content sent to the LLM endpoint | HuggingFace inference endpoint (external) | Possibly | Governed by that provider |
+| Deletion audit trail | SQLite `deletion_log` | No — metadata only, no content | Retained (compliance evidence) |
 
 Rules that follow from the map:
 - **Do not add PII to telemetry or logs** without a documented reason and
@@ -101,6 +105,7 @@ map above whenever data handling changes.
 
 - [ ] Is the new data actually necessary? (minimization)
 - [ ] Is it personal data? If so: retention set + delete/export path exists?
+- [ ] If deletable, is the erasure logged to `deletion_log` (metadata only)?
 - [ ] Does it leave the box (external call)? Disclosed in the privacy policy?
 - [ ] Logs/telemetry free of raw PII and secrets?
 - [ ] Privacy policy still accurate? Update `/privacy` if not.

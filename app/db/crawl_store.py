@@ -9,7 +9,7 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from app.db.base import session_scope
-from app.db.models import CrawlJobRecord
+from app.db.models import CrawlJobRecord, DeletionLog
 from app.models.schemas import CrawlJob
 
 
@@ -74,11 +74,18 @@ async def list_crawl_jobs(limit: int = 100) -> list[dict]:
     ]
 
 
-async def delete_crawl_job(job_id: str) -> bool:
-    """Erase a crawl job and the content it captured. False if it wasn't there."""
+async def delete_crawl_job(job_id: str, actor: str | None = None) -> bool:
+    """Erase a crawl job and the content it captured. False if it wasn't there.
+
+    The deletion and its audit-log entry commit in one transaction, so a
+    recorded erasure always corresponds to a real one (and vice versa).
+    """
     async with session_scope() as session:
         record = await session.get(CrawlJobRecord, job_id)
         if record is None:
             return False
         await session.delete(record)
+        session.add(
+            DeletionLog(target_type="crawl_job", target_id=job_id, count=1, actor=actor)
+        )
     return True
