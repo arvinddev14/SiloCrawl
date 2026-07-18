@@ -4,13 +4,13 @@ import json
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from app.core import telemetry
 from app.core.auth import require_api_key
 from app.core.config import get_settings
-from app.db import crawl_store, telemetry_store
+from app.db import audit_store, crawl_store, telemetry_store
 from app.db.base import session_scope
 from app.db.models import TelemetryEvent
 from app.models.schemas import (
@@ -195,9 +195,11 @@ async def list_crawl_jobs_endpoint(limit: int = 100):
 
 
 @router.delete("/crawl/{job_id}")
-async def delete_crawl_job_endpoint(job_id: str):
-    """Erase a crawl job and the content it captured (right to deletion)."""
-    if not await crawl_store.delete_crawl_job(job_id):
+async def delete_crawl_job_endpoint(job_id: str, request: Request):
+    """Erase a crawl job and the content it captured (right to deletion).
+    Logged to the deletion audit trail."""
+    actor = getattr(request.state, "api_key_id", None)
+    if not await crawl_store.delete_crawl_job(job_id, actor=actor):
         raise HTTPException(404, "Job not found")
     return {"id": job_id, "deleted": True}
 
@@ -258,11 +260,21 @@ async def telemetry_export_endpoint(hours: int = 0, limit: int = 5000):
 
 
 @router.delete("/telemetry")
-async def telemetry_purge_endpoint(older_than_hours: int | None = None):
+async def telemetry_purge_endpoint(request: Request, older_than_hours: int | None = None):
     """Purge telemetry by time window (right to erasure). Omit the window to
-    delete all telemetry events."""
-    removed = await telemetry_store.purge_events(older_than_hours=older_than_hours)
+    delete all telemetry events. Logged to the deletion audit trail."""
+    actor = getattr(request.state, "api_key_id", None)
+    removed = await telemetry_store.purge_events(
+        older_than_hours=older_than_hours, actor=actor
+    )
     return {"deleted": removed}
+
+
+@router.get("/audit/deletions")
+async def audit_deletions_endpoint(limit: int = 200):
+    """Append-only log of data-subject erasures (metadata only) for compliance
+    review: what was deleted, how many rows, by whom, and when."""
+    return {"deletions": await audit_store.list_deletions(limit)}
 
 
 @router.get("/benchmarks")

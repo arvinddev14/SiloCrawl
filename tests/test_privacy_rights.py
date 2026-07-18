@@ -2,7 +2,7 @@
 crawl-job list/export/delete and telemetry export/purge."""
 from datetime import datetime, timedelta, timezone
 
-from app.db import crawl_store, telemetry_store
+from app.db import audit_store, crawl_store, telemetry_store
 from app.db.base import session_scope
 from app.db.models import TelemetryEvent
 from app.models.schemas import CrawlJob, CrawlStatus
@@ -89,3 +89,42 @@ async def test_telemetry_export_and_purge_endpoints(client):
     assert purge.status_code == 200
     assert purge.json()["deleted"] == 2
     assert (await client.get("/v1/telemetry")).json()["count"] == 0
+
+
+# ---------- deletion audit log ----------
+
+async def test_deletions_are_logged_atomically(temp_db):
+    await jobstore.create("j", url="https://example.com")
+    async with session_scope() as s:
+        await _event(s, "scrape", "e", age_hours=1)
+
+    await crawl_store.delete_crawl_job("j", actor="key-abc")
+    await telemetry_store.purge_events(older_than_hours=0, actor="key-abc")
+
+    log = await audit_store.list_deletions()
+    kinds = {d["target_type"]: d for d in log}
+    assert set(kinds) == {"crawl_job", "telemetry"}
+    assert kinds["crawl_job"]["target_id"] == "j"
+    assert kinds["crawl_job"]["count"] == 1
+    assert kinds["telemetry"]["count"] == 1
+    assert all(d["actor"] == "key-abc" for d in log)
+
+
+async def test_failed_delete_is_not_logged(temp_db):
+    assert await crawl_store.delete_crawl_job("nope") is False
+    assert await telemetry_store.purge_events() == 0  # nothing to purge
+    assert await audit_store.list_deletions() == []  # no phantom log entries
+
+
+async def test_audit_endpoint_reports_deletions(client):
+    await jobstore.save(
+        CrawlJob(id="k", status=CrawlStatus.completed), url="https://example.com"
+    )
+    await client.delete("/v1/crawl/k")
+
+    resp = await client.get("/v1/audit/deletions")
+    assert resp.status_code == 200
+    entries = resp.json()["deletions"]
+    assert entries[0]["target_type"] == "crawl_job"
+    assert entries[0]["target_id"] == "k"
+    assert entries[0]["created_at"] is not None

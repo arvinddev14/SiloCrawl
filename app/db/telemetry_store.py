@@ -13,7 +13,7 @@ from typing import Any
 from sqlalchemy import delete, select
 
 from app.db.base import session_scope
-from app.db.models import TelemetryEvent
+from app.db.models import DeletionLog, TelemetryEvent
 
 
 async def export_events(hours: int = 0, limit: int = 5000) -> list[dict[str, Any]]:
@@ -37,13 +37,25 @@ async def export_events(hours: int = 0, limit: int = 5000) -> list[dict[str, Any
     ]
 
 
-async def purge_events(older_than_hours: int | None = None) -> int:
+async def purge_events(older_than_hours: int | None = None, actor: str | None = None) -> int:
     """Delete telemetry events. ``older_than_hours=None`` (or <=0) deletes all;
-    otherwise only events older than that window. Returns the number removed."""
+    otherwise only events older than that window. Returns the number removed.
+
+    A non-empty purge writes its audit-log entry in the same transaction."""
     async with session_scope() as session:
         stmt = delete(TelemetryEvent)
         if older_than_hours is not None and older_than_hours > 0:
             cutoff = datetime.now(timezone.utc) - timedelta(hours=older_than_hours)
             stmt = stmt.where(TelemetryEvent.created_at < cutoff)
         result = await session.execute(stmt)
-    return result.rowcount or 0
+        removed = result.rowcount or 0
+        if removed:
+            session.add(
+                DeletionLog(
+                    target_type="telemetry",
+                    count=removed,
+                    actor=actor,
+                    meta={"older_than_hours": older_than_hours},
+                )
+            )
+    return removed
